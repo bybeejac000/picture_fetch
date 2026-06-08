@@ -1,0 +1,53 @@
+package database
+
+import (
+	"database/sql"
+	"fmt"
+)
+
+type SlideshowServer struct {
+	db           *sql.DB
+	immichURL    string
+	immichAPIKey string
+}
+
+func (s *SlideshowServer) getSlideshowList() ([]string, error) {
+	query := `
+		SELECT id 
+		FROM asset
+		ORDER BY RANDOM() 
+		LIMIT 50;`
+
+	rows, err := s.db.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("query failed: %v", err)
+	}
+	defer rows.Close()
+
+	var links []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan failed: %v", err)
+		}
+		link := fmt.Sprintf("%s/api/assets/%s/thumbnail?size=preview", s.immichURL, id)
+		links = append(links, link)
+	}
+	return links, nil
+}
+
+func ReturnSlideshowList(immichURL string, immichAPIKey string) ([]string, error) {
+	db, err := ConnectToDB()
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to database: %v", err)
+	}
+	defer db.Close()
+
+	server := &SlideshowServer{
+		db:           db,
+		immichURL:    immichURL,
+		immichAPIKey: immichAPIKey,
+	}
+
+	return server.getSlideshowList()
+}
