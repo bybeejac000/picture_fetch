@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 )
@@ -11,14 +12,14 @@ type SlideshowServer struct {
 	immichAPIKey string
 }
 
-func (s *SlideshowServer) getSlideshowList() ([]string, error) {
+func (s *SlideshowServer) getSlideshowList(ctx context.Context) ([]string, error) {
 	query := `
 		SELECT id 
 		FROM asset
 		ORDER BY RANDOM() 
 		LIMIT 50;`
 
-	rows, err := s.db.Query(query)
+	rows, err := s.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("query failed: %v", err)
 	}
@@ -36,7 +37,7 @@ func (s *SlideshowServer) getSlideshowList() ([]string, error) {
 	return links, nil
 }
 
-func ReturnSlideshowList(immichURL string, immichAPIKey string) ([]string, error) {
+func ReturnSlideshowList(ctx context.Context, immichURL string, immichAPIKey string) ([]string, error) {
 	db, err := ConnectToDB()
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %v", err)
@@ -49,5 +50,5 @@ func ReturnSlideshowList(immichURL string, immichAPIKey string) ([]string, error
 		immichAPIKey: immichAPIKey,
 	}
 
-	return server.getSlideshowList()
+	return server.getSlideshowList(ctx)
 }

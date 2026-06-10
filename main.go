@@ -2,21 +2,15 @@ package main
 
 import (
 	"log"
-	"photo_fetch/database"
-	"photo_fetch/redis"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
-	envConfig := declareEnv()
-
-	links, err := database.ReturnSlideshowList(envConfig.ImmichURL, envConfig.ImmichAPIKey)
-	if err != nil {
-		log.Fatalf("Failed to get slideshow list: %v", err)
+	if err := godotenv.Load(); err != nil {
+		log.Fatal("Error loading .env file")
 	}
 
-	err = redis.PushListToRedis(links, envConfig.PhotosListKey)
-	if err != nil {
-		log.Fatalf("Failed to push list to Redis: %v", err)
-	}
+	SetRoutes()
 
 }
