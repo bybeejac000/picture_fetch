@@ -8,15 +8,18 @@ import (
 )
 
 type EnvConfig struct {
-	ImmichURL    string
-	ImmichAPIKey string
+	ImmichURL     string
+	ImmichAPIKey  string
+	PhotosListKey string
 }
 
 func declareEnv() EnvConfig {
 	immichURL := strings.TrimSuffix(os.Getenv("IMMICH_URL"), "/")
-	immichApiKey := os.Getenv("IMMICH_API_KEY")
+	immichApiKey := os.Getenv("IMMICH_RO_API_KEY")
+	photosListKey := os.Getenv("PHOTOS_LIST_KEY")
 	return EnvConfig{
-		ImmichURL:    immichURL,
-		ImmichAPIKey: immichApiKey,
+		ImmichURL:     immichURL,
+		ImmichAPIKey:  immichApiKey,
+		PhotosListKey: photosListKey,
 	}
 }

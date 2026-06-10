@@ -30,7 +30,7 @@ func (s *SlideshowServer) getSlideshowList() ([]string, error) {
 		if err := rows.Scan(&id); err != nil {
 			return nil, fmt.Errorf("scan failed: %v", err)
 		}
-		link := fmt.Sprintf("%s/api/assets/%s/thumbnail?size=preview", s.immichURL, id)
+		link := fmt.Sprintf("%s/api/assets/%s/thumbnail?size=preview&apiKey=%s", s.immichURL, id, s.immichAPIKey)
 		links = append(links, link)
 	}
 	return links, nil

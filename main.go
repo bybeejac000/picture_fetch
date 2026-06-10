@@ -1,9 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"photo_fetch/database"
+	"photo_fetch/redis"
 )
 
 func main() {
@@ -14,5 +14,9 @@ func main() {
 		log.Fatalf("Failed to get slideshow list: %v", err)
 	}
 
-	fmt.Println(links)
+	err = redis.PushListToRedis(links, envConfig.PhotosListKey)
+	if err != nil {
+		log.Fatalf("Failed to push list to Redis: %v", err)
+	}
+
 }
