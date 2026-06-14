@@ -1,12 +1,11 @@
-package main
+package routes
 
 import (
 	"fmt"
 	"net/http"
-	"os"
 )
 
-func SetRoutes() {
+func refreshPictures() {
 	http.HandleFunc("/refresh", func(w http.ResponseWriter, r *http.Request) {
 		if err := RefreshSlideshowList(r.Context()); err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -18,6 +17,9 @@ func SetRoutes() {
 		fmt.Printf("Slideshow list refreshed successfully!\n")
 	})
 
-	fmt.Printf("Server is listening on port %s\n", os.Getenv("GO_LISTEN_PORT"))
-	http.ListenAndServe(":"+os.Getenv("GO_LISTEN_PORT"), nil)
+}
+
+func SetRoutes() {
+	refreshPictures()
+	fmt.Printf("Routes set.\n")
 }

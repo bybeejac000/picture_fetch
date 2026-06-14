@@ -1,16 +1,19 @@
 package main
 
 import (
-	"log"
-
-	"github.com/joho/godotenv"
+	"fmt"
+	"net/http"
+	"os"
+	"photo_fetch/routes"
+	"photo_fetch/startup"
+	"photo_fetch/websocket"
 )
 
 func main() {
-	if err := godotenv.Load(); err != nil {
-		log.Fatal("Error loading .env file")
-	}
+	startup.StartupScript()
+	websocket.InitializeSockets()
+	routes.SetRoutes()
 
-	SetRoutes()
-
+	fmt.Printf("Server is listening on port %s\n", os.Getenv("GO_LISTEN_PORT"))
+	http.ListenAndServe(":"+os.Getenv("GO_LISTEN_PORT"), nil)
 }

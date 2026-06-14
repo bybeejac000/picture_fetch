@@ -34,8 +34,7 @@ func ReadListFromRedis(ctx context.Context, keyName string) ([]string, error) {
 func ClearListInRedis(ctx context.Context, keyName string) error {
 	rdb := connectRedis()
 	defer rdb.Close()
-	ctx, cancel := context.WithTimeout(ctx, QUERY_TIMEOUT)
-	defer cancel()
+
 	_, err := rdb.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
 		pipe.Del(ctx, keyName)
 		return nil

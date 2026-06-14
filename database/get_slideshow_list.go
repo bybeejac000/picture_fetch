@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"photo_fetch/config"
 )
 
 type SlideshowServer struct {
@@ -13,11 +14,12 @@ type SlideshowServer struct {
 }
 
 func (s *SlideshowServer) getSlideshowList(ctx context.Context) ([]string, error) {
-	query := `
-		SELECT id 
-		FROM asset
-		ORDER BY RANDOM() 
-		LIMIT 50;`
+	query := fmt.Sprintf(`
+			SELECT id 
+			FROM asset
+			WHERE type = 'IMAGE'
+			ORDER BY RANDOM() 
+			LIMIT %d;`, config.SLIDESHOW_BATCH_SIZE)
 
 	rows, err := s.db.QueryContext(ctx, query)
 	if err != nil {
