@@ -39,13 +39,13 @@ func unifiWebsocketReadLoop(conn *websocket.Conn) {
 			continue // skip bad message, keep listening
 		}
 
-		// if len(event.Item.SmartDetectTypes) == 0 {
-		// 	continue
-		// }
+		if len(event.Item.SmartDetectTypes) == 0 || event.Item.End == 0 {
+			continue
+		}
 
-		// if event.Item.SmartDetectTypes[0] != "person" {
-		// 	continue
-		// }
+		if event.Item.SmartDetectTypes[0] != "person" {
+			continue
+		}
 
 		fmt.Println("Person detected, capturing frames")
 		filePath, err := picture_processing.CaptureFrames()

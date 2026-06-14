@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"photo_fetch/database"
 	"photo_fetch/redis"
+	"photo_fetch/smart_pictures"
 )
 
 func RefreshSlideshowList(ctx context.Context) error {
-	links, err := database.ReturnSlideshowList(ctx, os.Getenv("IMMICH_URL"), os.Getenv("IMMICH_RO_API_KEY"))
+	links, err := smart_pictures.ReturnSlideshowList(ctx, os.Getenv("IMMICH_URL"), os.Getenv("IMMICH_RO_API_KEY"))
 	if err != nil {
 		return fmt.Errorf("Failed to get slideshow list: %v", err)
 	}

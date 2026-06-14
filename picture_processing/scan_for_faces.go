@@ -16,21 +16,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/fogleman/gg"
+
 	"github.com/pgvector/pgvector-go"
 )
-
-type BoundingBox struct {
-	X1 float64 `json:"x1"`
-	Y1 float64 `json:"y1"`
-	X2 float64 `json:"x2"`
-	Y2 float64 `json:"y2"`
-}
-
-type FaceDetection struct {
-	BoundingBox BoundingBox  `json:"boundingBox"`
-	Embedding   RawEmbedding `json:"embedding"`
-	Score       float64      `json:"score"`
-}
 
 // RawEmbedding handles the embedding being returned as either a JSON string or array
 type RawEmbedding []float32
@@ -63,13 +52,7 @@ func (e *RawEmbedding) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-type PredictResponse struct {
-	FacialRecognition []FaceDetection `json:"facial-recognition"`
-	ImageHeight       int             `json:"imageHeight"`
-	ImageWidth        int             `json:"imageWidth"`
-}
-
-func detectFaces(imagePath string, minScore float64) (*PredictResponse, error) {
+func detectFaces(imagePath string, minScore float64) (*FaceDetectionResponse, error) {
 	entries := map[string]any{
 		"facial-recognition": map[string]any{
 			"detection": map[string]any{
@@ -131,7 +114,7 @@ func detectFaces(imagePath string, minScore float64) (*PredictResponse, error) {
 		return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, body)
 	}
 
-	var result PredictResponse
+	var result FaceDetectionResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
@@ -170,12 +153,52 @@ func getPersonNameByEmbedding(ctx context.Context, e RawEmbedding) (string, erro
 	return name, nil
 }
 
+func addNamesToImages(filePath string, faces []FaceDetection, names []string, hasUnknown bool) error {
+	dc, err := gg.LoadImage(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to load image: %w", err)
+	}
+
+	ctx := gg.NewContextForImage(dc)
+
+	// draw "New Face Detected!" banner at the top
+	if hasUnknown {
+		ctx.SetRGB(1, 0, 0) // red background
+		ctx.DrawRectangle(0, 0, float64(ctx.Width()), 40)
+		ctx.Fill()
+		ctx.SetRGB(1, 1, 1) // white text
+		ctx.DrawStringAnchored("New Face Detected!", float64(ctx.Width())/2, 20, 0.5, 0.5)
+	}
+
+	for _, face := range faces {
+		ctx.SetRGB(0, 1, 0)
+		ctx.SetLineWidth(3)
+		x := float64(face.BoundingBox.X1)
+		y := float64(face.BoundingBox.Y1)
+		w := float64(face.BoundingBox.X2 - face.BoundingBox.X1)
+		h := float64(face.BoundingBox.Y2 - face.BoundingBox.Y1)
+		ctx.DrawRectangle(x, y, w, h)
+		ctx.Stroke()
+	}
+
+	ctx.SetRGB(0, 1, 0)
+	for i, name := range names {
+		face := faces[i]
+		x := float64(face.BoundingBox.X1)
+		y := float64(face.BoundingBox.Y1)
+		ctx.DrawString(name, x, y-5)
+	}
+
+	return ctx.SavePNG(filePath)
+}
 func ProcessImages(filePath string) ([]string, bool) {
 	fmt.Println("Processing FACE")
 	result, err := detectFaces(filePath, 0.5)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
+		fmt.Print("Error detecting faces\nDeleting file...\n")
+		os.Remove(filePath)
+		return nil, false
 	}
 
 	fmt.Printf("Image size: %dx%d\n", result.ImageWidth, result.ImageHeight)
@@ -193,13 +216,19 @@ func ProcessImages(filePath string) ([]string, bool) {
 			face.BoundingBox.X2, face.BoundingBox.Y2,
 			len(face.Embedding),
 		)
-		faceName, err := getPersonNameByEmbedding(context.Background(), face.Embedding)
+		var e RawEmbedding
+		if err := e.UnmarshalJSON([]byte(face.Embedding)); err != nil {
+			fmt.Fprintf(os.Stderr, "failed to parse embedding: %v\n", err)
+			continue
+		}
+		faceName, err := getPersonNameByEmbedding(context.Background(), e)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
 			continue
 		}
 		facesList = append(facesList, faceName)
 	}
+	addNamesToImages(filePath, result.FacialRecognition, facesList, true)
 
 	return facesList, true
 }
