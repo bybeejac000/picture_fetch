@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"photo_fetch/config"
 	"photo_fetch/picture_processing"
 
 	"github.com/gorilla/websocket"
@@ -38,17 +39,27 @@ func unifiWebsocketReadLoop(conn *websocket.Conn) {
 			continue // skip bad message, keep listening
 		}
 
-		// Guard: skip events with no smart detect types
-		if len(event.Item.SmartDetectTypes) == 0 {
-			continue
-		}
+		// if len(event.Item.SmartDetectTypes) == 0 {
+		// 	continue
+		// }
 
-		if event.Item.SmartDetectTypes[0] != "person" {
-			continue
-		}
+		// if event.Item.SmartDetectTypes[0] != "person" {
+		// 	continue
+		// }
 
 		fmt.Println("Person detected, capturing frames")
-		picture_processing.CaptureFrames()
-		picture_processing.ProcessImages()
+		filePath, err := picture_processing.CaptureFrames()
+		if err != nil {
+			log.Printf("Error capturing frames: %v\n", err)
+			continue
+		}
+		facesList, facesDetected := picture_processing.ProcessImages(filePath)
+		if facesDetected {
+			for _, faceName := range facesList {
+				fmt.Printf("Detected face: %s\n", faceName)
+				detectedFaceUrl := fmt.Sprintf("http://%s:%s/photo?file=%s", "localhost", config.GO_LISTEN_PORT, filePath)
+				InjectPictures(InjectPicturesConn, 1, []string{detectedFaceUrl})
+			}
+		}
 	}
 }

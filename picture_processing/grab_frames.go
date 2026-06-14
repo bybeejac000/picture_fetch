@@ -51,7 +51,7 @@ func captureSnapshot(client *http.Client, label string) (string, error) {
 	return filename, nil
 }
 
-func CaptureFrames() {
+func CaptureFrames() (string, error) {
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create output directory: %v\n", err)
 		os.Exit(1)
@@ -65,10 +65,12 @@ func CaptureFrames() {
 	}
 
 	fmt.Println("Capturing snapshot...")
-	if _, err := captureSnapshot(client, "frame1"); err != nil {
+	filePath, err := captureSnapshot(client, "frame1")
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 
 	fmt.Printf("\nDone. Frame saved to ./%s/\n", outputDir)
+	return filePath, nil
 }

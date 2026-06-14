@@ -170,9 +170,9 @@ func getPersonNameByEmbedding(ctx context.Context, e RawEmbedding) (string, erro
 	return name, nil
 }
 
-func ProcessImages() {
+func ProcessImages(filePath string) ([]string, bool) {
 	fmt.Println("Processing FACE")
-	result, err := detectFaces(`C:\Users\jakeb\OneDrive\Pictures\Camera Roll\WIN_20260311_11_36_37_Pro.jpg`, 0.7)
+	result, err := detectFaces(filePath, 0.5)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
@@ -181,8 +181,11 @@ func ProcessImages() {
 	fmt.Printf("Image size: %dx%d\n", result.ImageWidth, result.ImageHeight)
 	fmt.Printf("Faces detected: %d\n", len(result.FacialRecognition))
 	if len(result.FacialRecognition) == 0 {
-		return
+		fmt.Print("No faces detected in this picture\nDeleting file...\n")
+		os.Remove(filePath)
+		return nil, false
 	}
+	facesList := []string{}
 	for i, face := range result.FacialRecognition {
 		fmt.Printf("  Face %d: score=%.2f bbox=(%.0f,%.0f)-(%.0f,%.0f) embedding_dims=%d\n",
 			i+1, face.Score,
@@ -190,6 +193,13 @@ func ProcessImages() {
 			face.BoundingBox.X2, face.BoundingBox.Y2,
 			len(face.Embedding),
 		)
-		getPersonNameByEmbedding(context.Background(), face.Embedding)
+		faceName, err := getPersonNameByEmbedding(context.Background(), face.Embedding)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			continue
+		}
+		facesList = append(facesList, faceName)
 	}
+
+	return facesList, true
 }

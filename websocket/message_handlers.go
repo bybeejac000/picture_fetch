@@ -10,14 +10,29 @@ func handleMessage(messageType int, msg []byte) error {
 	return nil
 }
 
-func injectPictures(conn *websocket.Conn, messageType int, msg []byte) error {
+type WebSocketInjectPicturesMessage struct {
+	MessageType int      `json:"messageType"`
+	Message     []string `json:"message"`
+}
 
-	if err := conn.WriteMessage(messageType, msg); err != nil {
+func InjectPictures(conn *websocket.Conn, messageType int, msg []string) error {
+
+	if conn == nil {
+		fmt.Printf("WebSocket connection is not established\n")
+		return fmt.Errorf("WebSocket connection is not established")
+	}
+
+	payload := WebSocketInjectPicturesMessage{
+		MessageType: messageType,
+		Message:     msg,
+	}
+
+	if err := conn.WriteJSON(payload); err != nil {
 		fmt.Printf("WebSocket write error: %v\n", err)
 		return err
 	}
 
-	fmt.Printf("Message %s sent successfully\n", string(msg))
+	fmt.Printf("Message %v sent successfully\n", msg)
 	return nil
 }
 

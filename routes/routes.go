@@ -19,7 +19,15 @@ func refreshPictures() {
 
 }
 
+func displayPictures() {
+	http.HandleFunc("/photo", func(w http.ResponseWriter, r *http.Request) {
+		imageName := r.URL.Query().Get("file")
+		http.ServeFile(w, r, imageName)
+	})
+}
+
 func SetRoutes() {
 	refreshPictures()
+	displayPictures()
 	fmt.Printf("Routes set.\n")
 }

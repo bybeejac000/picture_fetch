@@ -17,16 +17,21 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+var InjectPicturesConn *websocket.Conn
+
 func createWebsocketInjectPictures() {
 	http.HandleFunc("/injectPictures", func(w http.ResponseWriter, r *http.Request) {
-		conn, err := upgrader.Upgrade(w, r, nil)
+		var err error
+		InjectPicturesConn, err = upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			fmt.Printf("WebSocket upgrade failed: %v\n", err)
 			return
 		}
-		defer conn.Close()
+		//defer InjectPicturesConn.Close()
 
-		readLoop(conn, handleMessage)
+		fmt.Printf("WebSocket connection established for InjectPictures\n")
+
+		readLoop(InjectPicturesConn, handleMessage)
 	})
 }
 
@@ -62,7 +67,7 @@ func connectWithReconnect() {
 
 func InitializeSockets() {
 	createWebsocketInjectPictures()
-	connectWithReconnect()
+	go connectWithReconnect()
 	fmt.Printf("Websockets initialized.\n")
 
 }
