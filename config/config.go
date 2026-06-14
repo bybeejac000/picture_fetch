@@ -21,6 +21,11 @@ var REDIS_PORT string
 var PHOTOS_LIST_KEY string
 var GO_LISTEN_PORT string
 var SLIDESHOW_BATCH_SIZE int
+var DOORBELL_HOST string
+var UNIFI_API_KEY string
+var DOORBELL_ID string
+var ML_SERVER string
+var ML_FACE_MODEL string
 
 func LoadConfig() {
 	if err := godotenv.Load(); err != nil {
@@ -39,5 +44,10 @@ func LoadConfig() {
 	PHOTOS_LIST_KEY = os.Getenv("PHOTOS_LIST_KEY")
 	GO_LISTEN_PORT = os.Getenv("GO_LISTEN_PORT")
 	SLIDESHOW_BATCH_SIZE, _ = strconv.Atoi(os.Getenv("SLIDESHOW_BATCH_SIZE"))
+	DOORBELL_HOST = os.Getenv("DOORBELL_HOST")
+	UNIFI_API_KEY = os.Getenv("UNIFI_API_KEY")
+	DOORBELL_ID = os.Getenv("DOORBELL_ID")
+	ML_SERVER = os.Getenv("ML_SERVER")
+	ML_FACE_MODEL = os.Getenv("ML_FACE_MODEL")
 
 }
