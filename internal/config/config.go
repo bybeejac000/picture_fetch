@@ -1,7 +1,7 @@
 package config
 
 import (
-	"fmt"
+	"log"
 	"os"
 	"strconv"
 
@@ -30,10 +30,10 @@ type Config struct {
 }
 
 func Load() (*Config, error) {
-	if err := godotenv.Load(); err != nil {
-		return nil, fmt.Errorf("loading .env file: %w", err)
+	err := godotenv.Load()
+	if err != nil {
+		log.Println("loading .env file:", err) // just log, don't fatal
 	}
-
 	batchSize, _ := strconv.Atoi(os.Getenv("SLIDESHOW_BATCH_SIZE"))
 
 	return &Config{
