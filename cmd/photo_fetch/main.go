@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"photo_fetch/internal/cleanup"
 	"photo_fetch/internal/config"
 	"photo_fetch/internal/database"
 	"photo_fetch/internal/faces"
@@ -38,6 +39,9 @@ func main() {
 	if err := slideshowSvc.Refresh(ctx); err != nil {
 		log.Fatal(err)
 	}
+	cleanupCtx, cleanupCancel := context.WithCancel(context.Background())
+	defer cleanupCancel()
+	go cleanup.StartCleanupLoop(cleanupCtx, cfg.CleanupDir, 10*time.Second)
 
 	mux := http.NewServeMux()
 	routes.Register(mux, slideshowSvc)

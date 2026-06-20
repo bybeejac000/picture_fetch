@@ -27,6 +27,7 @@ type Config struct {
 	DoorbellID         string
 	MLServer           string
 	MLFaceModel        string
+	CleanupDir         string
 }
 
 func Load() (*Config, error) {
@@ -55,5 +56,6 @@ func Load() (*Config, error) {
 		DoorbellID:         os.Getenv("DOORBELL_ID"),
 		MLServer:           os.Getenv("ML_SERVER"),
 		MLFaceModel:        os.Getenv("ML_FACE_MODEL"),
+		CleanupDir:         os.Getenv("CLEANUP_DIR"),
 	}, nil
 }
