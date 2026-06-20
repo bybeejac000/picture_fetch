@@ -33,6 +33,9 @@ func (s *Service) Refresh(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("getting slideshow list: %w", err)
 	}
+	if len(links) == 0 {
+		return fmt.Errorf("no photos found for slideshow")
+	}
 	if err := s.store.ClearList(ctx, s.cfg.PhotosListKey); err != nil {
 		return fmt.Errorf("clearing list in redis: %w", err)
 	}

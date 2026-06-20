@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/fogleman/gg"
@@ -159,9 +160,10 @@ func (p *Processor) detectFaces(imagePath string, minScore float64) (*FaceDetect
 	return &result, nil
 }
 
-func (p *Processor) personNameByEmbedding(ctx context.Context, e RawEmbedding) (string, error) {
+func (p *Processor) personNameByEmbedding(ctx context.Context, e RawEmbedding) (FaceInfo, error) {
 	query := `
 		SELECT p."name"
+		,p."personid"
 		FROM (
 			SELECT f."faceId"
 			FROM face_search f
@@ -172,20 +174,20 @@ func (p *Processor) personNameByEmbedding(ctx context.Context, e RawEmbedding) (
 		LEFT JOIN public.person p ON p.id = af."personId";
 	`
 
-	var name string
-	err := p.db.QueryRowContext(ctx, query, pgvector.NewVector(e)).Scan(&name)
+	var name, personID string
+	err := p.db.QueryRowContext(ctx, query, pgvector.NewVector(e)).Scan(&name, &personID)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return "", nil
+			return FaceInfo{}, nil
 		}
-		return "", err
+		return FaceInfo{}, err
 	}
 
 	log.Printf("found person %s", name)
-	return name, nil
+	return FaceInfo{Name: name, Id: personID}, nil
 }
 
-func (p *Processor) addNames(filePath string, detections []FaceDetection, names []string, hasUnknown bool) error {
+func (p *Processor) addNames(filePath string, detections []FaceDetection, names []FaceInfo, hasUnknown bool) error {
 	img, err := gg.LoadImage(filePath)
 	if err != nil {
 		return fmt.Errorf("loading image: %w", err)
@@ -217,13 +219,13 @@ func (p *Processor) addNames(filePath string, detections []FaceDetection, names 
 		face := detections[i]
 		x := face.BoundingBox.X1
 		y := face.BoundingBox.Y1
-		dc.DrawString(name, x, y-5)
+		dc.DrawString(name.Name, x, y-5)
 	}
 
 	return dc.SavePNG(filePath)
 }
 
-func (p *Processor) Process(filePath string) ([]string, bool) {
+func (p *Processor) Process(filePath string) ([]FaceInfo, bool) {
 	log.Println("processing face")
 	result, err := p.detectFaces(filePath, 0.5)
 	if err != nil {
@@ -241,7 +243,7 @@ func (p *Processor) Process(filePath string) ([]string, bool) {
 		return nil, false
 	}
 
-	facesList := []string{}
+	facesList := []FaceInfo{}
 	for i, face := range result.FacialRecognition {
 		log.Printf("face %d: score=%.2f bbox=(%.0f,%.0f)-(%.0f,%.0f) embedding_dims=%d",
 			i+1, face.Score,
@@ -254,14 +256,54 @@ func (p *Processor) Process(filePath string) ([]string, bool) {
 			log.Printf("failed to parse embedding: %v", err)
 			continue
 		}
-		faceName, err := p.personNameByEmbedding(context.Background(), e)
+		faceInfo, err := p.personNameByEmbedding(context.Background(), e)
 		if err != nil {
 			log.Printf("error: %v", err)
 			continue
 		}
-		facesList = append(facesList, faceName)
+		facesList = append(facesList, faceInfo)
 	}
 	p.addNames(filePath, result.FacialRecognition, facesList, true)
 
 	return facesList, true
+}
+
+func (p *Processor) PullPhotosByFace(ctx context.Context, facesInfo []FaceInfo) ([]string, error) {
+	if len(facesInfo) == 0 {
+		return nil, fmt.Errorf("no faces provided")
+	}
+
+	placeholders := make([]string, len(facesInfo))
+	args := make([]interface{}, len(facesInfo))
+	for i, face := range facesInfo {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+		args[i] = face.Id
+	}
+
+	query := fmt.Sprintf(`
+        SELECT a."id"
+        FROM asset a
+        JOIN asset_face af ON af."assetId" = a.id
+        WHERE a.type = 'IMAGE'
+        AND af."personId" IN (%s)
+        ORDER BY RANDOM()
+        LIMIT 5;
+    `, strings.Join(placeholders, ","))
+
+	rows, err := p.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("querying face assets: %w", err)
+	}
+	defer rows.Close()
+
+	var faceUrls []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		faceUrls = append(faceUrls, fmt.Sprintf("%s/api/assets/%s/thumbnail?size=preview&apiKey=%s", p.cfg.ImmichURL, id, p.cfg.ImmichROAPIKey))
+	}
+
+	return faceUrls, nil
 }

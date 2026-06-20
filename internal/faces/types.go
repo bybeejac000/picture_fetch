@@ -13,6 +13,11 @@ type BoundingBox struct {
 	Y2 float64 `json:"y2"`
 }
 
+type FaceInfo struct {
+	Name string
+	Id   string
+}
+
 type FaceDetection struct {
 	BoundingBox BoundingBox `json:"boundingBox"`
 	Embedding   string      `json:"embedding"`
