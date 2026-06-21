@@ -95,8 +95,8 @@ func (m *Manager) unifiReadLoop(conn *websocket.Conn) {
 			for _, faceInfo := range facesList {
 				log.Printf("detected face: %s", faceInfo.Name)
 				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-				cancel()
 				faceImages, err := m.faces.PullPhotosByFace(ctx, []faces.FaceInfo{faceInfo})
+				cancel()
 				if err != nil {
 					log.Printf("error pulling photos by face: %v", err)
 					continue
@@ -104,7 +104,9 @@ func (m *Manager) unifiReadLoop(conn *websocket.Conn) {
 				injectUrlList = append(injectUrlList, faceImages...)
 			}
 			m.inject(1, injectUrlList)
-			log.Printf("injected new photo for person: %s and possibly others", facesList[0].Name)
+			if len(facesList) > 0 {
+				log.Printf("injected new photo for person: %s and possibly others", facesList[0].Name)
+			}
 		}
 	}
 }

@@ -163,7 +163,7 @@ func (p *Processor) detectFaces(imagePath string, minScore float64) (*FaceDetect
 func (p *Processor) personNameByEmbedding(ctx context.Context, e RawEmbedding) (FaceInfo, error) {
 	query := `
 		SELECT p."name"
-		,p."personid"
+		,p."id"
 		FROM (
 			SELECT f."faceId"
 			FROM face_search f
@@ -304,6 +304,8 @@ func (p *Processor) PullPhotosByFace(ctx context.Context, facesInfo []FaceInfo) 
 		}
 		faceUrls = append(faceUrls, fmt.Sprintf("%s/api/assets/%s/thumbnail?size=preview&apiKey=%s", p.cfg.ImmichURL, id, p.cfg.ImmichROAPIKey))
 	}
+
+	fmt.Println("Faces found from doorbell:", faceUrls)
 
 	return faceUrls, nil
 }
