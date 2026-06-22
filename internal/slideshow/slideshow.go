@@ -33,6 +33,9 @@ func (s *Service) Refresh(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("getting slideshow list: %w", err)
 	}
+	if len(links) == 0 {
+		return fmt.Errorf("no photos found for slideshow")
+	}
 	if err := s.store.ClearList(ctx, s.cfg.PhotosListKey); err != nil {
 		return fmt.Errorf("clearing list in redis: %w", err)
 	}
@@ -126,15 +129,15 @@ func (s *Service) birthdays(ctx context.Context) ([]person, error) {
 			,p."faceAssetId"
 			FROM public.person p
 			WHERE p."birthDate" IS NOT NULL
-			AND EXTRACT(MONTH FROM p."birthDate") = EXTRACT(MONTH FROM CURRENT_DATE)
-			AND EXTRACT(DAY FROM p."birthDate") = EXTRACT(DAY FROM CURRENT_DATE);`
+			AND EXTRACT(MONTH FROM "birthDate") = EXTRACT(MONTH FROM NOW() AT TIME ZONE 'America/Denver')
+			AND EXTRACT(DAY FROM "birthDate") = EXTRACT(DAY FROM NOW() AT TIME ZONE 'America/Denver');`
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	rows, err := s.db.QueryContext(ctx, query)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("Querying birthdays: %w", err)
 	}
 	defer rows.Close()
 
@@ -142,8 +145,9 @@ func (s *Service) birthdays(ctx context.Context) ([]person, error) {
 	for rows.Next() {
 		var p person
 		if err := rows.Scan(&p.ID, &p.Name, &p.ThumbnailPath, &p.FaceAssetID); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("Scanning birthday row: %w", err)
 		}
+		fmt.Printf("Happy Birthday to %s", p.Name)
 		birthdays = append(birthdays, p)
 	}
 

@@ -1,11 +1,13 @@
 package realtime
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"photo_fetch/internal/faces"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -86,11 +88,24 @@ func (m *Manager) unifiReadLoop(conn *websocket.Conn) {
 		}
 
 		facesList, detected := m.faces.Process(filePath)
+		injectUrlList := []string{}
 		if detected {
-			for _, faceName := range facesList {
-				log.Printf("detected face: %s", faceName)
-				url := fmt.Sprintf("http://%s:%s/photo?file=%s", "localhost", m.cfg.GoListenPort, filePath)
-				m.inject(1, []string{url})
+			url := fmt.Sprintf("http://%s:%s/photo?file=%s", "localhost", m.cfg.GoListenPort, filePath)
+			injectUrlList = append(injectUrlList, url)
+			for _, faceInfo := range facesList {
+				log.Printf("detected face: %s", faceInfo.Name)
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				faceImages, err := m.faces.PullPhotosByFace(ctx, []faces.FaceInfo{faceInfo})
+				cancel()
+				if err != nil {
+					log.Printf("error pulling photos by face: %v", err)
+					continue
+				}
+				injectUrlList = append(injectUrlList, faceImages...)
+			}
+			m.inject(1, injectUrlList)
+			if len(facesList) > 0 {
+				log.Printf("injected new photo for person: %s and possibly others", facesList[0].Name)
 			}
 		}
 	}

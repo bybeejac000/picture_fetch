@@ -1,7 +1,7 @@
 package config
 
 import (
-	"fmt"
+	"log"
 	"os"
 	"strconv"
 
@@ -27,13 +27,14 @@ type Config struct {
 	DoorbellID         string
 	MLServer           string
 	MLFaceModel        string
+	CleanupDir         string
 }
 
 func Load() (*Config, error) {
-	if err := godotenv.Load(); err != nil {
-		return nil, fmt.Errorf("loading .env file: %w", err)
+	err := godotenv.Load()
+	if err != nil {
+		log.Println("loading .env file:", err) // just log, don't fatal
 	}
-
 	batchSize, _ := strconv.Atoi(os.Getenv("SLIDESHOW_BATCH_SIZE"))
 
 	return &Config{
@@ -55,5 +56,6 @@ func Load() (*Config, error) {
 		DoorbellID:         os.Getenv("DOORBELL_ID"),
 		MLServer:           os.Getenv("ML_SERVER"),
 		MLFaceModel:        os.Getenv("ML_FACE_MODEL"),
+		CleanupDir:         os.Getenv("CLEANUP_DIR"),
 	}, nil
 }
