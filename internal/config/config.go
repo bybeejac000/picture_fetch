@@ -1,9 +1,11 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -12,6 +14,7 @@ type Config struct {
 	ImmichAPIKey       string
 	ImmichROAPIKey     string
 	ImmichURL          string
+	ImmichUserIds      []string
 	DBHost             string
 	DBPort             string
 	DBUser             string
@@ -37,6 +40,11 @@ func Load() (*Config, error) {
 	}
 	batchSize, _ := strconv.Atoi(os.Getenv("SLIDESHOW_BATCH_SIZE"))
 
+	rawEnv := os.Getenv("IMMICH_USER_IDS")
+	if rawEnv == "" {
+		return nil, fmt.Errorf("IMMICH_USER_IDS is not set")
+	}
+	userIds := strings.Split(rawEnv, ",")
 	return &Config{
 		ImmichAPIKey:       os.Getenv("IMMICH_API_KEY"),
 		ImmichROAPIKey:     os.Getenv("IMMICH_RO_API_KEY"),
@@ -50,6 +58,7 @@ func Load() (*Config, error) {
 		RedisPort:          os.Getenv("REDIS_PORT"),
 		PhotosListKey:      os.Getenv("PHOTOS_LIST_KEY"),
 		GoListenPort:       os.Getenv("GO_LISTEN_PORT"),
+		ImmichUserIds:      userIds,
 		SlideshowBatchSize: batchSize,
 		DoorbellHost:       os.Getenv("DOORBELL_HOST"),
 		UnifiAPIKey:        os.Getenv("UNIFI_API_KEY"),

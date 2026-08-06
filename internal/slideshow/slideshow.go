@@ -84,7 +84,7 @@ func (s *Service) assetIDs(ctx context.Context) ([]string, error) {
     `, strings.Join(placeholders, ","), s.cfg.SlideshowBatchSize)
 
 		rows, err := s.db.QueryContext(ctx, query, args...)
-		if err != nil {
+		if err != nil || rows.Err() != nil {
 			return nil, fmt.Errorf("querying birthday assets: %w", err)
 		}
 		defer rows.Close()
@@ -97,15 +97,37 @@ func (s *Service) assetIDs(ctx context.Context) ([]string, error) {
 			assetIDs = append(assetIDs, id)
 		}
 	} else {
-		query := fmt.Sprintf(`
-        SELECT id
-        FROM asset
-        WHERE type = 'IMAGE'
-        ORDER BY RANDOM()
-        LIMIT %d;`, s.cfg.SlideshowBatchSize)
 
-		rows, err := s.db.QueryContext(ctx, query)
-		if err != nil {
+		query := `
+			SELECT a.id
+			FROM asset a
+			WHERE a.type = 'IMAGE'
+			AND (
+				a."ownerId" = $1
+				OR a."ownerId" IN (
+					SELECT "sharedById" FROM partner WHERE "sharedWithId" = $1
+				)
+				OR a.id IN (
+					SELECT aa."assetId" FROM album_asset aa
+					JOIN album_user su ON su."albumId" = aa."albumId"
+					WHERE su."userId" = $1
+					UNION
+					SELECT aa."assetId" FROM album_asset aa
+					JOIN album al ON al.id = aa."albumId"
+					WHERE al."ownerId" = $1
+				)
+			)
+			AND a."originalPath" NOT LIKE '%.lrdata%'
+			AND a."originalPath" NOT LIKE '%.lrcat%'
+			AND a."originalPath" NOT LIKE '%.lrprev%'
+
+			ORDER BY RANDOM()
+			LIMIT $2;
+		`
+
+		// Pass parameters directly into your database driver:
+		rows, err := s.db.QueryContext(ctx, query, s.cfg.ImmichUserIds[0], s.cfg.SlideshowBatchSize)
+		if err != nil || rows.Err() != nil {
 			return nil, fmt.Errorf("query failed: %w", err)
 		}
 		defer rows.Close()
