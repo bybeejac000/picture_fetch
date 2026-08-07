@@ -73,15 +73,37 @@ func (s *Service) assetIDs(ctx context.Context) ([]string, error) {
 			args[i] = p.ID
 		}
 
+		userIDArgPos := len(args) + 1
+		limitArgPos := len(args) + 2
+		args = append(args, s.cfg.ImmichUserIds[0], s.cfg.SlideshowBatchSize)
+
 		query := fmt.Sprintf(`
-        SELECT a."id"
+        SELECT DISTINCT a."id"
         FROM asset a
         JOIN asset_face af ON af."assetId" = a.id
         WHERE a.type = 'IMAGE'
         AND af."personId" IN (%s)
+        AND (
+			a."ownerId" = $%d
+			OR a."ownerId" IN (
+				SELECT "sharedById" FROM partner WHERE "sharedWithId" = $%d
+			)
+			OR a.id IN (
+				SELECT aa."assetId" FROM album_asset aa
+				JOIN album_user su ON su."albumId" = aa."albumId"
+				WHERE su."userId" = $%d
+				UNION
+				SELECT aa."assetId" FROM album_asset aa
+				JOIN album al ON al.id = aa."albumId"
+				WHERE al."ownerId" = $%d
+			)
+		)
+		AND a."originalPath" NOT LIKE '%%.lrdata%%'
+		AND a."originalPath" NOT LIKE '%%.lrcat%%'
+		AND a."originalPath" NOT LIKE '%%.lrprev%%'
         ORDER BY RANDOM()
-        LIMIT %d;
-    `, strings.Join(placeholders, ","), s.cfg.SlideshowBatchSize)
+        LIMIT $%d;
+    `, strings.Join(placeholders, ","), userIDArgPos, userIDArgPos, userIDArgPos, userIDArgPos, limitArgPos)
 
 		rows, err := s.db.QueryContext(ctx, query, args...)
 		if err != nil || rows.Err() != nil {
@@ -171,6 +193,10 @@ func (s *Service) birthdays(ctx context.Context) ([]person, error) {
 		}
 		fmt.Printf("Happy Birthday to %s", p.Name)
 		birthdays = append(birthdays, p)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating birthday rows: %w", err)
 	}
 
 	return birthdays, nil
