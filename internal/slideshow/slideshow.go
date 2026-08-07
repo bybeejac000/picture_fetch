@@ -28,6 +28,11 @@ type person struct {
 	FaceAssetID   string `json:"faceAssetId"`
 }
 
+type assetRef struct {
+	ID   string
+	Type string
+}
+
 func (s *Service) Refresh(ctx context.Context) error {
 	links, err := s.list(ctx)
 	if err != nil {
@@ -46,24 +51,30 @@ func (s *Service) Refresh(ctx context.Context) error {
 }
 
 func (s *Service) list(ctx context.Context) ([]string, error) {
-	assetIDs, err := s.assetIDs(ctx)
+	assets, err := s.assetIDs(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting slideshow list: %w", err)
 	}
 
-	for i, id := range assetIDs {
-		assetIDs[i] = fmt.Sprintf("%s/api/assets/%s/thumbnail?size=preview&apiKey=%s", s.cfg.ImmichURL, id, s.cfg.ImmichROAPIKey)
+	links := make([]string, 0, len(assets))
+	for _, asset := range assets {
+		switch asset.Type {
+		case "VIDEO":
+			links = append(links, fmt.Sprintf("%s/api/assets/%s/video/playback?apiKey=%s", s.cfg.ImmichURL, asset.ID, s.cfg.ImmichROAPIKey))
+		default:
+			links = append(links, fmt.Sprintf("%s/api/assets/%s/thumbnail?size=preview&apiKey=%s", s.cfg.ImmichURL, asset.ID, s.cfg.ImmichROAPIKey))
+		}
 	}
-	return assetIDs, nil
+	return links, nil
 }
 
-func (s *Service) assetIDs(ctx context.Context) ([]string, error) {
+func (s *Service) assetIDs(ctx context.Context) ([]assetRef, error) {
 	birthdays, err := s.birthdays(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting birthdays: %w", err)
 	}
 
-	var assetIDs []string
+	var assets []assetRef
 
 	if len(birthdays) > 0 {
 		placeholders := make([]string, len(birthdays))
@@ -78,32 +89,30 @@ func (s *Service) assetIDs(ctx context.Context) ([]string, error) {
 		args = append(args, s.cfg.ImmichUserIds[0], s.cfg.SlideshowBatchSize)
 
 		query := fmt.Sprintf(`
-        SELECT DISTINCT a."id"
-        FROM asset a
-        JOIN asset_face af ON af."assetId" = a.id
-        WHERE a.type = 'IMAGE'
-        AND af."personId" IN (%s)
-        AND (
-			a."ownerId" = $%d
-			OR a."ownerId" IN (
-				SELECT "sharedById" FROM partner WHERE "sharedWithId" = $%d
+		SELECT * FROM (
+			SELECT DISTINCT a."id", a."type"
+			FROM asset a
+			JOIN asset_face af ON af."assetId" = a.id
+			WHERE a.type IN ('IMAGE', 'VIDEO')
+			AND af."personId" IN (%s)
+			AND (
+				a."ownerId" = $%d
+				OR a."ownerId" IN (
+					SELECT "sharedById" FROM partner WHERE "sharedWithId" = $%d
+				)
+				OR a.id IN (
+					SELECT aa."assetId" FROM album_asset aa
+					JOIN album_user au ON au."albumId" = aa."albumId"
+					WHERE au."userId" = $%d
+				)
 			)
-			OR a.id IN (
-				SELECT aa."assetId" FROM album_asset aa
-				JOIN album_user su ON su."albumId" = aa."albumId"
-				WHERE su."userId" = $%d
-				UNION
-				SELECT aa."assetId" FROM album_asset aa
-				JOIN album al ON al.id = aa."albumId"
-				WHERE al."ownerId" = $%d
-			)
-		)
-		AND a."originalPath" NOT LIKE '%%.lrdata%%'
-		AND a."originalPath" NOT LIKE '%%.lrcat%%'
-		AND a."originalPath" NOT LIKE '%%.lrprev%%'
-        ORDER BY RANDOM()
-        LIMIT $%d;
-    `, strings.Join(placeholders, ","), userIDArgPos, userIDArgPos, userIDArgPos, userIDArgPos, limitArgPos)
+			AND a."originalPath" NOT LIKE '%%.lrdata%%'
+			AND a."originalPath" NOT LIKE '%%.lrcat%%'
+			AND a."originalPath" NOT LIKE '%%.lrprev%%'
+		) sub
+		ORDER BY RANDOM()
+		LIMIT $%d;
+	`, strings.Join(placeholders, ","), userIDArgPos, userIDArgPos, userIDArgPos, limitArgPos)
 
 		rows, err := s.db.QueryContext(ctx, query, args...)
 		if err != nil || rows.Err() != nil {
@@ -112,18 +121,18 @@ func (s *Service) assetIDs(ctx context.Context) ([]string, error) {
 		defer rows.Close()
 
 		for rows.Next() {
-			var id string
-			if err := rows.Scan(&id); err != nil {
+			var asset assetRef
+			if err := rows.Scan(&asset.ID, &asset.Type); err != nil {
 				return nil, err
 			}
-			assetIDs = append(assetIDs, id)
+			assets = append(assets, asset)
 		}
 	} else {
 
 		query := `
-			SELECT a.id
+			SELECT a.id, a.type
 			FROM asset a
-			WHERE a.type = 'IMAGE'
+			WHERE a.type IN ('VIDEO', 'IMAGE')
 			AND (
 				a."ownerId" = $1
 				OR a."ownerId" IN (
@@ -131,12 +140,8 @@ func (s *Service) assetIDs(ctx context.Context) ([]string, error) {
 				)
 				OR a.id IN (
 					SELECT aa."assetId" FROM album_asset aa
-					JOIN album_user su ON su."albumId" = aa."albumId"
-					WHERE su."userId" = $1
-					UNION
-					SELECT aa."assetId" FROM album_asset aa
-					JOIN album al ON al.id = aa."albumId"
-					WHERE al."ownerId" = $1
+					JOIN album_user au ON au."albumId" = aa."albumId"
+					WHERE au."userId" = $1
 				)
 			)
 			AND a."originalPath" NOT LIKE '%.lrdata%'
@@ -155,15 +160,15 @@ func (s *Service) assetIDs(ctx context.Context) ([]string, error) {
 		defer rows.Close()
 
 		for rows.Next() {
-			var id string
-			if err := rows.Scan(&id); err != nil {
+			var asset assetRef
+			if err := rows.Scan(&asset.ID, &asset.Type); err != nil {
 				return nil, err
 			}
-			assetIDs = append(assetIDs, id)
+			assets = append(assets, asset)
 		}
 	}
 
-	return assetIDs, nil
+	return assets, nil
 }
 
 func (s *Service) birthdays(ctx context.Context) ([]person, error) {
